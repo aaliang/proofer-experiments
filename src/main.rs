@@ -5,6 +5,8 @@ extern crate rand;
 use rand::{Rng};
 use proof::{proofer};
 use proof::parallel_race_pool::{Pool, ParallelRacePool};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 pub struct ProofTask {
     input: String,
@@ -14,9 +16,9 @@ pub struct ProofTask {
 
 //trait implementation example
 struct Executor;
-impl ParallelRacePool<ProofTask, Option<usize>> for Executor {
-    fn task_func (task: ProofTask) -> Option<usize> {
-        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound)
+impl ParallelRacePool<ProofTask, usize> for Executor {
+    fn task_func (task: ProofTask, should_continue: &Arc<AtomicBool>) -> Option<usize> {
+        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound, should_continue)
     }
 }
 
@@ -40,8 +42,8 @@ fn test_prp_as_trait (input: String) -> Option <usize> {
 //inline callback example
 fn test_prp_as_callback (input: String) -> Option <usize> {
     let concurrency = 4;
-    let pool = Pool::new(concurrency, |task: ProofTask| {
-        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound)
+    let pool = Pool::new(concurrency, |task: ProofTask, should_continue: &Arc<AtomicBool>| {
+        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound, should_continue)
     });
     let max_size = usize::max_value();
     let frac = max_size / concurrency;

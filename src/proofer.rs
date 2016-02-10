@@ -1,6 +1,7 @@
 use std::mem;
 use std::thread;
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
 use crypto::sha1::Sha1;
 use crypto::digest::Digest;
 
@@ -52,7 +53,7 @@ pub fn get_proof (inp: &[u8], difficulty: usize) -> usize {
     }
 }
 
-pub fn get_proof_para (inp: &[u8], difficulty: usize, lb: usize, ub: usize) -> Option<usize> {
+pub fn get_proof_para (inp: &[u8], difficulty: usize, lb: usize, ub: usize, should_continue: &Arc<AtomicBool>) -> Option<usize> {
     let mut buffer = [0; 2048];
     for (a, b) in inp.iter().zip(buffer.iter_mut()) {
         *b = *a;
@@ -61,6 +62,10 @@ pub fn get_proof_para (inp: &[u8], difficulty: usize, lb: usize, ub: usize) -> O
     let mut s:usize = lb;
 
     'outer: loop {
+        if !should_continue.load(Ordering::Relaxed) {
+            return None;
+        }
+
         let arr : [u8; 8]= unsafe { mem::transmute(s.to_be()) };
         let mut new_buffer: [u8; 2048] = unsafe { mem::transmute_copy(&buffer) };
         {
