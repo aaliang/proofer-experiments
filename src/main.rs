@@ -4,13 +4,7 @@ extern crate rand;
 
 use rand::{Rng};
 use proof::{proofer};
-use proof::parallel_race_pool::{Pool, ParallelRacePoolTrait};
-use std::sync::mpsc::{Sender, Receiver, channel};
-
-pub struct TaskPool {
-    workers: Vec<Sender<ProofTask>>,
-    wait_rx: Receiver<Option<usize>>
-}
+use proof::parallel_race_pool::{Pool, ParallelRacePool};
 
 pub struct ProofTask {
     input: String,
@@ -18,30 +12,17 @@ pub struct ProofTask {
     upper_bound: usize
 }
 
-impl ParallelRacePoolTrait<ProofTask, Option<usize>, TaskPool> for TaskPool {
-    fn init_pool (workers: Vec<Sender<ProofTask>>, wait_rx: Receiver<Option<usize>>) -> TaskPool {
-        TaskPool {
-            workers: workers,
-            wait_rx: wait_rx
-        }
-    }
-
-    fn get_workers (&self) -> &Vec<Sender<ProofTask>> {
-        &self.workers
-    }
-
-    fn get_wait_rx (&self) -> &Receiver<Option<usize>> {
-        &self.wait_rx
-    }
-
+//trait implementation example
+struct Executor;
+impl ParallelRacePool<ProofTask, Option<usize>> for Executor {
     fn task_func (task: ProofTask) -> Option<usize> {
-        proofer::get_proof_para(&task.input.into_bytes(), 2, task.lower_bound, task.upper_bound)
+        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound)
     }
 }
 
 fn test_prp_as_trait (input: String) -> Option <usize> {
     let concurrency = 4;
-    let pool = TaskPool::new(concurrency);
+    let pool = Executor::new(concurrency);
     let max_size = usize::max_value();
     let frac = max_size / concurrency;
     let task_list = (0..concurrency).map(|x| {
@@ -56,10 +37,11 @@ fn test_prp_as_trait (input: String) -> Option <usize> {
     pool.send_tasks_and_wait(task_list)
 }
 
-fn test_prp_callback (input: String) -> Option <usize> {
+//inline callback example
+fn test_prp_as_callback (input: String) -> Option <usize> {
     let concurrency = 4;
-    let pool = Pool::new(concurrency, |task: ProofTask| {
-        proofer::get_proof_para(&task.input.into_bytes(), 2, task.lower_bound, task.upper_bound)
+    let pool = Pool::init(concurrency, |task: ProofTask| {
+        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound)
     });
     let max_size = usize::max_value();
     let frac = max_size / concurrency;
@@ -85,8 +67,7 @@ fn main () {
 
     let before = time::precise_time_ns();
 
-    let input2 = "eeee".to_string();
-    let x = test_prp_callback(input2);
+    let x = test_prp_as_trait(input);
 
     let elapsed = (time::precise_time_ns() - before) as f64;
     let as_ms = elapsed/1000000.0;
