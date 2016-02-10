@@ -10,7 +10,7 @@ pub struct Pool <T, R> {
 impl <T, R> Pool <T, R> where T:Send + 'static, R: Send + 'static {
     /// spawns multiple threads to parallel task f
     /// work is not started until it is started with Self::send_tasks_and_wait
-    pub fn init <F> (num_threads: usize, f: F) -> Pool <T, R>
+    pub fn new <F> (num_threads: usize, f: F) -> Pool <T, R>
     where F: Fn (T) -> R + Sync + Send + 'static {
         let (done, wait) = channel();
         let func = Arc::new(f);
@@ -47,12 +47,12 @@ impl <T, R> Pool <T, R> where T:Send + 'static, R: Send + 'static {
     }
 }
 
-/// alternative to using Pool::init. Trait implementation is required
+/// alternative to using Pool::new. Trait implementation is required
 pub trait ParallelRacePool <T, R> where T:Send + 'static, R: Send + 'static {
     // the task to launch (divided)
     fn task_func (task: T) -> R;
 
-    fn new (num_threads: usize) -> Pool<T, R> {
+    fn init (num_threads: usize) -> Pool<T, R> {
         let (done, wait) = channel();
         let workers = (0..num_threads).map(|_| {
             let (snd, work) = channel();

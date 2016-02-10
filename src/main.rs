@@ -22,7 +22,7 @@ impl ParallelRacePool<ProofTask, Option<usize>> for Executor {
 
 fn test_prp_as_trait (input: String) -> Option <usize> {
     let concurrency = 4;
-    let pool = Executor::new(concurrency);
+    let pool = Executor::init(concurrency);
     let max_size = usize::max_value();
     let frac = max_size / concurrency;
     let task_list = (0..concurrency).map(|x| {
@@ -40,7 +40,7 @@ fn test_prp_as_trait (input: String) -> Option <usize> {
 //inline callback example
 fn test_prp_as_callback (input: String) -> Option <usize> {
     let concurrency = 4;
-    let pool = Pool::init(concurrency, |task: ProofTask| {
+    let pool = Pool::new(concurrency, |task: ProofTask| {
         proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound)
     });
     let max_size = usize::max_value();
