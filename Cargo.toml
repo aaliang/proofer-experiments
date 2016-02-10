@@ -1,0 +1,9 @@
+[package]
+name = "proof"
+version = "0.1.0"
+authors = ["aliang <aliang2344@gmail.com>"]
+
+[dependencies]
+rust-crypto = "0.2.34"
+time = "*"
+rand = "*"
