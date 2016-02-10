@@ -4,7 +4,7 @@ extern crate rand;
 
 use rand::{Rng};
 use proof::{proofer};
-use proof::parallel_race_pool::ParallelRacePoolTrait;
+use proof::parallel_race_pool::{Pool, ParallelRacePoolTrait};
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 pub struct TaskPool {
@@ -39,8 +39,8 @@ impl ParallelRacePoolTrait<ProofTask, Option<usize>, TaskPool> for TaskPool {
     }
 }
 
-fn test_prp (input: String) -> Option <usize> {
-    let concurrency = 1;
+fn test_prp_as_trait (input: String) -> Option <usize> {
+    let concurrency = 4;
     let pool = TaskPool::new(concurrency);
     let max_size = usize::max_value();
     let frac = max_size / concurrency;
@@ -56,6 +56,26 @@ fn test_prp (input: String) -> Option <usize> {
     pool.send_tasks_and_wait(task_list)
 }
 
+fn test_prp_callback (input: String) -> Option <usize> {
+    let concurrency = 4;
+    let pool = Pool::new(concurrency, |task: ProofTask| {
+        proofer::get_proof_para(&task.input.into_bytes(), 2, task.lower_bound, task.upper_bound)
+    });
+    let max_size = usize::max_value();
+    let frac = max_size / concurrency;
+    let task_list = (0..concurrency).map(|x| {
+        let lower = x * frac;
+        let upper = (x + 1) * frac;
+        ProofTask{
+            input: input.clone(),
+            upper_bound: upper,
+            lower_bound: lower
+        }
+    }).collect::<Vec<ProofTask>>();
+    pool.send_tasks_and_wait(task_list)
+}
+
+
 
 fn main () {
     let input = rand::thread_rng()
@@ -65,10 +85,8 @@ fn main () {
 
     let before = time::precise_time_ns();
 
-    //let x = proofer::get_proof(&input.into_bytes(), 1);
-
     let input2 = "eeee".to_string();
-    let x = test_prp(input2);
+    let x = test_prp_callback(input2);
 
     let elapsed = (time::precise_time_ns() - before) as f64;
     let as_ms = elapsed/1000000.0;
