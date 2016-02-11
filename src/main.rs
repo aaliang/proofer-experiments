@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 pub struct ProofTask {
     input: String,
+    difficulty: usize,
     lower_bound: usize,
     upper_bound: usize
 }
@@ -18,11 +19,11 @@ pub struct ProofTask {
 struct Executor;
 impl ParallelRacePool<ProofTask, usize> for Executor {
     fn task_func (task: ProofTask, should_continue: &Arc<AtomicBool>) -> Option<usize> {
-        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound, should_continue)
+        proofer::get_proof_para(&task.input.into_bytes(), task.difficulty, task.lower_bound, task.upper_bound, should_continue)
     }
 }
 
-fn test_prp_as_trait (input: String) -> Option <usize> {
+fn test_prp_as_trait (input: String, difficulty: usize) -> Option <usize> {
     let concurrency = 4;
     let pool = Executor::init(concurrency);
     let max_size = usize::max_value();
@@ -33,17 +34,18 @@ fn test_prp_as_trait (input: String) -> Option <usize> {
         ProofTask{
             input: input.clone(),
             upper_bound: upper,
-            lower_bound: lower
+            lower_bound: lower,
+            difficulty: difficulty
         }
     }).collect::<Vec<ProofTask>>();
     pool.send_tasks_and_wait(task_list)
 }
 
 //inline callback example
-fn test_prp_as_callback (input: String) -> Option <usize> {
+fn test_prp_as_callback (input: String, difficulty: usize) -> Option <usize> {
     let concurrency = 4;
-    let pool = Pool::new(concurrency, |task: ProofTask, should_continue: &Arc<AtomicBool>| {
-        proofer::get_proof_para(&task.input.into_bytes(), 4, task.lower_bound, task.upper_bound, should_continue)
+    let pool = Pool::new(concurrency, move |task: ProofTask, should_continue: &Arc<AtomicBool>| {
+        proofer::get_proof_para(&task.input.into_bytes(), task.difficulty, task.lower_bound, task.upper_bound, should_continue)
     });
     let max_size = usize::max_value();
     let frac = max_size / concurrency;
@@ -53,23 +55,40 @@ fn test_prp_as_callback (input: String) -> Option <usize> {
         ProofTask{
             input: input.clone(),
             upper_bound: upper,
-            lower_bound: lower
+            lower_bound: lower,
+            difficulty: difficulty
         }
     }).collect::<Vec<ProofTask>>();
     pool.send_tasks_and_wait(task_list)
 }
 
-
+use std::env;
 
 fn main () {
-    let input = rand::thread_rng()
+    let rand_string = || { rand::thread_rng()
         .gen_ascii_chars()
         .take(10)
-        .collect::<String>();
+                 .collect::<String>()
+                 };
+
+    let mut args = env::args();
+
+    let (difficulty, input) = match args.len() {
+        2 => {
+            (2, args.nth(1).unwrap())
+        },
+        3 => {
+            (args.nth(1).unwrap().parse::<usize>().unwrap(), args.nth(2).unwrap())
+        },
+        _ => {
+            (2, rand_string())
+        },
+
+    };
 
     let before = time::precise_time_ns();
 
-    let x = test_prp_as_trait(input);
+    let x = test_prp_as_trait(input, difficulty);
 
     let elapsed = (time::precise_time_ns() - before) as f64;
     let as_ms = elapsed/1000000.0;
